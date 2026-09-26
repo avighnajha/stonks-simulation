@@ -1,0 +1,9 @@
+{
+  "version": 1, "durationMs": 2000, "stepMs": 1000, "seed": 42,
+  "assets": [{"id":"a","name":"Footballer A","sector":"Sports","subsector":"Football","price":"100.00","marketWeight":0.01,"sectorWeight":0.02,"subsectorWeight":0.02,"idiosyncraticWeight":0.01}],
+  "groups": [
+    {"id":"seller","strategy":"scripted","count":1,"cash":"1000.00","inventory":"10.0000","wakeMs":1000,"delayMs":0,"signalNoise":0.1,"parameters":{"orders":[{"atMs":0,"asset":"a","side":"SELL","price":"99.00","quantity":"1.0000"}]}},
+    {"id":"buyer","strategy":"scripted","count":1,"cash":"1000.00","inventory":"10.0000","wakeMs":1000,"delayMs":100,"signalNoise":0.1,"parameters":{"orders":[{"atMs":1000,"asset":"a","side":"BUY","price":"100.00","quantity":"1.0000"}]}}
+  ],
+  "events": [{"atMs":500,"assetId":"a","shock":0.05,"releaseDelayMs":200,"headline":"Scheduled test news","signal":0.4}]
+}

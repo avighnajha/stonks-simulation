@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stonks-simulation"
+version = "0.1.0"
+description = "Controlled research runner and Python strategy SDK for Stonks"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+stonks-worker = "stonks_sim.worker:main"
+
+[tool.setuptools.packages.find]
+include = ["stonks_sim*"]
