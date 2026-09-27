@@ -44,4 +44,4 @@ jobs:
         env:
           RESEARCH_DATABASE_ADMIN_URL: postgresql://research_test:research_test@localhost:5432/postgres
         run: |
-          docker run --rm --network host --env RESEARCH_DATABASE_ADMIN_URL stonks-research:ci python -W error::ResourceWarning -m unittest discover -s tests -v
+          docker run --rm --network host --env RESEARCH_DATABASE_ADMIN_URL --env STONKS_EXCHANGE_DIR=/opt/exchange stonks-research:ci python -W error::ResourceWarning -m unittest discover -s tests -v
