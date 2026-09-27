@@ -1,0 +1,40 @@
+name: Python infrastructure checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_USER: research_test
+          POSTGRES_PASSWORD: research_test
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U research_test" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: simulation
+      - uses: actions/checkout@v4
+        with:
+          repository: avighnajha/Stonks
+          ref: codex/exchange-solidification
+          path: exchange
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build real exchange bridge
+        working-directory: exchange/services/trading_service
+        run: npm ci && npm run build
+      - name: Run SDK and PostgreSQL integration tests
+        working-directory: simulation
+        env:
+          STONKS_EXCHANGE_DIR: ${{ github.workspace }}/exchange
+          RESEARCH_DATABASE_ADMIN_URL: postgresql://research_test:research_test@localhost:5432/postgres
+        run: python -W error::ResourceWarning -m unittest discover -s tests -v

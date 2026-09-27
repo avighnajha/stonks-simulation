@@ -3,9 +3,27 @@ import copy,json,os,unittest,uuid
 from pathlib import Path
 from stonks_sim.worker import execute
 from stonks_sim.bridge import Bridge,provision
+from stonks_sim.sdk import Strategy
+from unittest.mock import patch
 
 @unittest.skipUnless(os.environ.get('RESEARCH_DATABASE_ADMIN_URL') and os.environ.get('STONKS_EXCHANGE_DIR'),'Isolated research PostgreSQL and built exchange required')
 class ExchangeTests(unittest.TestCase):
+    def test_runner_enforces_information_scope_and_delivery_time(self):
+        seen=[]
+        class Spy(Strategy):
+            def on_observation(self, observation, context):
+                seen.append((observation,context.now_ms));return []
+        m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
+        m['groups']=[{**m['groups'][0],'id':'observer','strategy':'idle','information':'none','delayMs':300}]
+        with patch('stonks_sim.simulation.registry',return_value={'idle':Spy}):
+            execute(m,str(uuid.uuid4()));self.assertEqual(seen,[])
+            m['groups'][0]['information']='public';execute(m,str(uuid.uuid4()))
+        self.assertEqual(len(seen),1)
+        observation,tick=seen[0]
+        self.assertEqual(tick,1000) # shock 500 + release 200 + delivery 300
+        self.assertNotIn('shock',observation)
+        self.assertEqual(observation['observedAt'],tick)
+
     def test_repeatable_real_settlement_and_observations(self):
         m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
         first=execute(m,str(uuid.uuid4()));second=execute(m,str(uuid.uuid4()))

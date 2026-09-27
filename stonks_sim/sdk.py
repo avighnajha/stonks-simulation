@@ -40,7 +40,7 @@ class Scripted(Strategy):
 def registry():
     """Operator-installed only. Never load module names supplied in user manifests."""
     classes = {'idle': Idle, 'scripted': Scripted}
-    for name, qualified in json.loads(os.environ.get('STONKS_STRATEGY_REGISTRY', '{}')).items():
+    for name, qualified in json.loads(os.environ.get('STONKS_STRATEGY_REGISTRY') or '{}').items():
         if name in classes: raise ValueError('Cannot replace infrastructure fixtures')
         module, cls = qualified.split(':', 1)
         implementation = getattr(importlib.import_module(module), cls)

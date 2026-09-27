@@ -66,6 +66,7 @@ def run(manifest, bridge, progress=lambda _:None, cancelled=lambda:False):
                 if tick:values[a['id']]+=math.sqrt(dt)*(a['marketWeight']*common+a['sectorWeight']*sectors[a['sector']]+a['subsectorWeight']*subs[a['sector']+'/'+a['subsector']]+a['idiosyncraticWeight']*rng('asset:'+a['id']).gauss(0,1))
                 if not math.isfinite(values[a['id']]) or not -10<values[a['id']]<25:raise ValueError('Reference value outside model range')
                 for label,agent in agents.items():
+                    if agent['group'].get('information','public') not in ('valuation','both'):continue
                     at=tick+agent['group']['delayMs']
                     if at<=end:
                         observed=math.exp(values[a['id']]+rng('valuation:'+label+':'+a['id']).gauss(0,agent['group']['signalNoise']))
@@ -76,6 +77,7 @@ def run(manifest, bridge, progress=lambda _:None, cancelled=lambda:False):
         elif kind=='release':
             e=p['event'];bridge.request('news',tick,asset=e['assetId'],headline=e['headline'],signal=e['signal'],key='news:'+str(p['index']))
             for label,a in agents.items():
+                if a['group'].get('information','public') not in ('public','both'):continue
                 at=tick+a['group']['delayMs']
                 if at<=end:scheduler.add(at,'observation',{'agent':label,'observation':permitted_news(e,tick,at,a['group']['signalNoise'],rng('news:'+label))})
         elif kind in ('wake','wake_once'):

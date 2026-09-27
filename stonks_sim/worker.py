@@ -1,5 +1,6 @@
 """One active run per worker; start extra workers only within a measured resource budget."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -43,11 +44,14 @@ def work_once():
     status='COMPLETED';result=None;error=''
     try:
         result=execute(job['manifest'],job['id'],lambda p:state.update(p),cancel.is_set)
-        result['versions']={'python':os.sys.version.split()[0], 'strategyRegistry':os.environ.get('STONKS_STRATEGY_REGISTRY','{}')}
+        result['versions']={'python':os.sys.version.split()[0], 'strategyRegistry':os.environ.get('STONKS_STRATEGY_REGISTRY') or '{}'}
         root=Path(os.environ['STONKS_EXCHANGE_DIR'])
         for label,cwd in [('exchange',root),('simulation',Path(__file__).resolve().parent.parent)]:
-            r=subprocess.run(['git','rev-parse','HEAD'],cwd=cwd,capture_output=True,text=True)
-            result['versions'][label]=r.stdout.strip() if r.returncode==0 else 'unversioned'
+            try:
+                r=subprocess.run(['git','rev-parse','HEAD'],cwd=cwd,capture_output=True,text=True,timeout=5)
+                result['versions'][label]=r.stdout.strip() if r.returncode==0 else 'unversioned'
+            except (OSError,subprocess.TimeoutExpired):result['versions'][label]='unversioned'
+        result['versions']['engineSha256']=hashlib.sha256((root/'services/trading_service/dist/exchange/exchange.service.js').read_bytes()).hexdigest()
     except Cancelled as e:status='CANCELLED';error=str(e)
     except Exception as e:status='FAILED';error=str(e)
     finally:stop.set();thread.join(timeout=25)
