@@ -28,7 +28,7 @@ def run(manifest, bridge, progress=lambda _:None, cancelled=lambda:False):
     for label in sorted(agents):scheduler.add(0,'wake',{'agent':label})
     sample_step=max(m['stepMs'],math.ceil(end/500))
     scheduler.add(0,'sample',{})
-    def context(label,tick):return Context(tick,bridge.request('state',tick,agent=label),agents[label]['rng'])
+    def context(label,tick):return Context(tick,bridge.request('state',tick,agent=label),agents[label]['rng'],dict(identities['assets']))
     def actions(label,tick,items):
         nonlocal commands
         if not isinstance(items,list) or len(items)>20:raise ValueError('Strategy must return at most 20 actions per callback')

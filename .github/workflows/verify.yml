@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: avighnajha/Stonks
-          ref: codex/exchange-solidification
+          ref: 7d81588ecc3c63dd2f015de32fec649735979a39 # Tested exchange contract; update deliberately.
           path: exchange
       - uses: actions/setup-node@v4
         with:
@@ -38,3 +38,10 @@ jobs:
           STONKS_EXCHANGE_DIR: ${{ github.workspace }}/exchange
           RESEARCH_DATABASE_ADMIN_URL: postgresql://research_test:research_test@localhost:5432/postgres
         run: python -W error::ResourceWarning -m unittest discover -s tests -v
+      - name: Build deployable research worker
+        run: docker build --build-context simulation=./simulation -f exchange/Dockerfile.research -t stonks-research:ci exchange
+      - name: Run settlement inside worker container
+        env:
+          RESEARCH_DATABASE_ADMIN_URL: postgresql://research_test:research_test@localhost:5432/postgres
+        run: |
+          docker run --rm --network host --env RESEARCH_DATABASE_ADMIN_URL stonks-research:ci python -W error::ResourceWarning -m unittest discover -s tests -v

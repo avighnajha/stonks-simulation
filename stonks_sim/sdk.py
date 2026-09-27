@@ -1,5 +1,5 @@
 """Owner-written algorithms implement Strategy; these fixtures are not market models."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from random import Random
 from typing import Any
 import importlib
@@ -11,6 +11,7 @@ class Context:
     now_ms: int
     state: dict[str, Any]
     rng: Random
+    asset_ids: dict[str, str] = field(default_factory=dict)
 
 class Strategy:
     def __init__(self, parameters):

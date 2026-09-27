@@ -28,6 +28,9 @@ For a standalone run use `--manifest examples/smoke.json --output result.json`.
 
 ## Your strategies
 
+Start with the [step-by-step SDK guide](docs/STRATEGY_GUIDE.md), including callback
+contracts, action examples, information controls, registration and testing.
+
 Subclass `stonks_sim.sdk.Strategy` in your own module. Implement callback methods
 and return a list of place/cancel/schedule actions. Use `context.rng` and
 `context.now_ms`; never wall time or unseeded randomness. Cash/quantity strings

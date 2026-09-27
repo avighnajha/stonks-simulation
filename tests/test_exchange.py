@@ -24,6 +24,19 @@ class ExchangeTests(unittest.TestCase):
         self.assertNotIn('shock',observation)
         self.assertEqual(observation['observedAt'],tick)
 
+    def test_strategy_can_resolve_public_asset_ids(self):
+        contexts=[]
+        class Spy(Strategy):
+            def on_wakeup(self, context):
+                contexts.append(context);return []
+        m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
+        m['groups']=[{**m['groups'][0],'strategy':'idle'}]
+        with patch('stonks_sim.simulation.registry',return_value={'idle':Spy}):
+            execute(m,str(uuid.uuid4()))
+        ctx=contexts[0]
+        self.assertEqual(set(ctx.asset_ids),set(ctx.state['books']))
+        self.assertEqual(ctx.asset_ids['a'],ctx.state['account']['positions'][0]['assetId'])
+
     def test_repeatable_real_settlement_and_observations(self):
         m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
         first=execute(m,str(uuid.uuid4()));second=execute(m,str(uuid.uuid4()))
