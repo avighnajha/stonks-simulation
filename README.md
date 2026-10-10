@@ -31,6 +31,10 @@ For a standalone run use `--manifest examples/smoke.json --output result.json`.
 Start with the [step-by-step SDK guide](docs/STRATEGY_GUIDE.md), including callback
 contracts, action examples, information controls, registration and testing.
 
+Typed asset/account/book/order/fill/observation/action contracts and a `py.typed`
+marker are included. Start from `examples/typed_strategy.py` for autocomplete and
+fully annotated callbacks. `context.assets` exposes public instrument metadata.
+
 Subclass `stonks_sim.sdk.Strategy` in your own module. Implement callback methods
 and return a list of place/cancel/schedule actions. Use `context.rng` and
 `context.now_ms`; never wall time or unseeded randomness. Cash/quantity strings

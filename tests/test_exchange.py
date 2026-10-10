@@ -3,7 +3,7 @@ import copy,json,os,unittest,uuid
 from pathlib import Path
 from stonks_sim.worker import execute
 from stonks_sim.bridge import Bridge,provision
-from stonks_sim.sdk import Strategy
+from stonks_sim.sdk import Strategy, Account, Wallet, Position, OrderBook, BookLevel, Fill, OrderAccepted, OrderRejected
 from unittest.mock import patch
 
 @unittest.skipUnless(os.environ.get('RESEARCH_DATABASE_ADMIN_URL') and os.environ.get('STONKS_EXCHANGE_DIR'),'Isolated research PostgreSQL and built exchange required')
@@ -36,6 +36,10 @@ class ExchangeTests(unittest.TestCase):
         ctx=contexts[0]
         self.assertEqual(set(ctx.asset_ids),set(ctx.state['books']))
         self.assertEqual(ctx.asset_ids['a'],ctx.state['account']['positions'][0]['assetId'])
+        metadata = ctx.assets['a']
+        self.assertEqual(metadata['exchange_id'], ctx.asset_ids['a'])
+        self.assertEqual(metadata['name'], m['assets'][0]['name'])
+        self.assertEqual(set(metadata), {'id','exchange_id','name','sector','subsector','initial_price'})
 
     def test_repeatable_real_settlement_and_observations(self):
         m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
@@ -44,6 +48,19 @@ class ExchangeTests(unittest.TestCase):
         self.assertEqual(len(first['report']['trades']),1)
         self.assertEqual(first['report']['trades'][0]['price'],'99.00')
         self.assertEqual(first['report']['cash'],'2000.000000')
+        for account in first['report']['accounts'].values():
+            self.assertTrue(Account.__required_keys__ <= account.keys())
+            self.assertTrue(Wallet.__required_keys__ <= account['wallet'].keys())
+            for position in account['positions']:
+                self.assertTrue(Position.__required_keys__ <= position.keys())
+        for book in first['report']['books'].values():
+            self.assertTrue(OrderBook.__required_keys__ <= book.keys())
+            for level in book['buys'] + book['sells']:
+                self.assertTrue(BookLevel.__required_keys__ <= level.keys())
+        for decision in first['decisions']:
+            response = decision['result']
+            contract = OrderRejected if response.get('rejected') else OrderAccepted
+            self.assertTrue(contract.__required_keys__ <= response.keys())
         self.assertTrue(first['report']['trades'][0]['timestamp'].startswith('2000-01-01T00:00:01'))
         changed=copy.deepcopy(m);changed['seed']=43
         third=execute(changed,str(uuid.uuid4()))

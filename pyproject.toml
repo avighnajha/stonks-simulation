@@ -14,3 +14,15 @@ stonks-worker = "stonks_sim.worker:main"
 
 [tool.setuptools.packages.find]
 include = ["stonks_sim*"]
+
+[project.optional-dependencies]
+dev = ["mypy==1.15.0"]
+
+[tool.setuptools.package-data]
+stonks_sim = ["py.typed"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+follow_imports = "silent"
+files = ["stonks_sim/types.py", "stonks_sim/sdk.py", "examples/typed_strategy.py"]

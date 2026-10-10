@@ -6,3 +6,5 @@ build/
 dist/
 .env
 results/
+
+.mypy_cache/

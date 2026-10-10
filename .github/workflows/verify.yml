@@ -29,6 +29,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Type-check SDK and strategy example
+        working-directory: simulation
+        run: |
+          python -m pip install ".[dev]"
+          python -m mypy
       - name: Build real exchange bridge
         working-directory: exchange/services/trading_service
         run: npm ci && npm run build

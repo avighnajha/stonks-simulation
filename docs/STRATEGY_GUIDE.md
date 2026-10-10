@@ -69,6 +69,50 @@ before a later callback, including between fill/wakeup callbacks at the same tim
 Use `decimal.Decimal` for money/quantity calculations. Emit prices as strings with
 two decimal places and quantities with four; no shorting or borrowing is supported.
 
+## Types and editor autocomplete
+
+Import contracts directly from `stonks_sim.sdk` (or `stonks_sim.types`).
+The package includes a `py.typed` marker for editors and installed-package type checking.
+See [the fully typed, inactive example](../examples/typed_strategy.py).
+
+| Contract | What it describes |
+| --- | --- |
+| `Asset` | Public name, sector/subsector, manifest `id`, exchange UUID `exchange_id`, `initial_price` |
+| `MarketState`, `Account`, `Wallet`, `Position` | Own available/reserved balances, holdings and marked P&L |
+| `OrderBook`, `BookLevel` | Public aggregated bid/ask levels; either side may be empty |
+| `Order`, `Fill` | Own exchange orders and executions, using exchange UUIDs |
+| `Observation`, `NewsObservation`, `ValuationObservation` | Delayed information; narrow with `observation['type']` |
+| `Action`, `PlaceAction`, `CancelAction`, `ScheduleAction` | Commands returned by callbacks |
+| `OrderUpdate`, `OrderAccepted`, `OrderRejected` | Acknowledgements; failures have `rejected: True` and `message` |
+| `Side`, `OrderType`, `OrderStatus` | Literal unions for valid enum values |
+| `AssetLabel`, `AssetId`, `OrderId`, `DecimalString` | Documented string aliases, not runtime wrappers |
+| `StrategyParameters` | Strategy-specific JSON configuration; validate your own parameters |
+
+`context.assets['a']` now supplies typed public instrument metadata. Its `id` is
+`'a'`; its `exchange_id` matches position/fill/order asset UUIDs. `initial_price`
+is the listing/start price, **not** a live fundamental value. Factor weights,
+shocks, future news and hidden values are excluded. Each callback gets fresh
+metadata dictionaries, so changes cannot alter another callback's metadata.
+The existing `context.asset_ids` mapping remains available.
+
+These are `TypedDict` contracts: access remains `position['quantity']`, not
+`position.quantity`. They add autocomplete/static checking without changing the
+JSON wire format or converting monetary values to floats. Runtime validation is
+still performed by the runner/exchange. Treat callback data as read-only.
+
+Prices, cash and quantities use decimal strings; `DecimalString` does not validate
+precision. Observation estimates/signals are floating-point model outputs.
+A successful cancellation omits `filledQuantity` and `message`; a rejected command
+has no `orderId`. Check for the relevant key before accessing it.
+
+To check your SDK and the example (Python 3.11+):
+
+```sh
+python -m pip install -e ".[dev]"
+python -m mypy
+python -m mypy --strict strategies/my_strategy.py
+```
+
 ## Actions
 
 ```python
