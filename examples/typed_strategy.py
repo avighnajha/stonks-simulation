@@ -15,7 +15,7 @@ class MyStrategy(Strategy):
 
     def on_wakeup(self, context: Context) -> list[Action]:
         self.available_cash = Decimal(context.state['account']['wallet']['balance'])
-        for label, asset in context.assets.items():
+        for label, asset in context.tradable_assets.items():
             book = context.state['books'][label]
             position = next((p for p in context.state['account']['positions']
                              if p['assetId'] == asset['exchange_id']), None)

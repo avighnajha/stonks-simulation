@@ -25,6 +25,14 @@ class Context:
     rng: Random
     asset_ids: dict[AssetLabel, AssetId] = field(default_factory=dict)
     assets: dict[AssetLabel, Asset] = field(default_factory=dict)
+    tradable_assets: dict[AssetLabel, Asset] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Legacy manually constructed contexts default to their visible universe.
+        if not self.tradable_assets:
+            object.__setattr__(self, 'tradable_assets', {
+                label: dict(asset) for label, asset in self.assets.items()
+            })
 
 class Strategy:
     def __init__(self, parameters: StrategyParameters) -> None:

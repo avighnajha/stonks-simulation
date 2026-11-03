@@ -33,7 +33,10 @@ contracts, action examples, information controls, registration and testing.
 
 Typed asset/account/book/order/fill/observation/action contracts and a `py.typed`
 marker are included. Start from `examples/typed_strategy.py` for autocomplete and
-fully annotated callbacks. `context.assets` exposes public instrument metadata.
+fully annotated callbacks. `context.assets` exposes public instrument metadata;
+`context.tradable_assets` is the group-configured subset to use for placing orders
+(SDK 0.2.0+). Both runner and exchange adapter enforce the trading scope. Starting
+shares are allocated per agent per tradable asset; other public books remain visible.
 
 Subclass `stonks_sim.sdk.Strategy` in your own module. Implement callback methods
 and return a list of place/cancel/schedule actions. Use `context.rng` and

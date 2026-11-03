@@ -27,3 +27,10 @@ class SdkTests(unittest.TestCase):
         self.assertEqual(get_type_hints(Strategy.on_observation)['observation'], Observation)
         self.assertEqual(get_type_hints(Strategy.on_fill)['fill'], Fill)
         self.assertEqual(get_type_hints(Strategy.on_order_update)['update'], OrderUpdate)
+
+    def test_tradable_metadata_defaults_to_visible_assets_for_existing_callers(self):
+        assets = public_assets([{'id':'a','name':'A','sector':'Sports','subsector':'Football','price':'100.00'}], {'a':'uuid-a'})
+        context = Context(0, {}, Random(1), {'a':'uuid-a'}, assets)
+        self.assertEqual(context.tradable_assets, assets)
+        context.tradable_assets['a']['name'] = 'Local change'
+        self.assertEqual(context.assets['a']['name'], 'A')

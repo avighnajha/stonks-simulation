@@ -91,9 +91,43 @@ See [the fully typed, inactive example](../examples/typed_strategy.py).
 `context.assets['a']` now supplies typed public instrument metadata. Its `id` is
 `'a'`; its `exchange_id` matches position/fill/order asset UUIDs. `initial_price`
 is the listing/start price, **not** a live fundamental value. Factor weights,
-shocks, future news and hidden values are excluded. Each callback gets fresh
-metadata dictionaries, so changes cannot alter another callback's metadata.
+shocks, future news and hidden values are excluded. Contexts receive detached metadata
+dictionaries, so changes do not alter the manifest or other agents' metadata.
 The existing `context.asset_ids` mapping remains available.
+
+## Trading universe (SDK 0.2.0+)
+
+Every agent has one cash balance shared across its tradable assets. Configure each
+population group's Trading universe in the Research UI: all experiment assets or
+an explicit selection. In manifests, `groups[].tradableAssets` is an optional
+non-empty, unique list of run asset labels, for example `["a", "b"]`. Omission
+means every experiment asset. This is a group setting, not strategy-specific JSON.
+
+Every callback receives `context.tradable_assets: dict[AssetLabel, Asset]`:
+
+```python
+for label, asset in context.tradable_assets.items():
+    book = context.state['books'][label]
+    # Choose quotes using this asset's inventory and your shared cash budget.
+```
+
+The values have the same typed public metadata as `context.assets`. Use this
+mapping as the order-placement universe. `context.assets`, `context.asset_ids`,
+books and permitted observations still include all experiment assets, so a bot
+can use another market as information without trading it. Full account positions
+remain visible. The runner and Node adapter independently reject placement outside
+the configured scope, even if strategy code changes its local context dictionary.
+These checks are not an operating-system sandbox for untrusted Python.
+
+Starting inventory is allocated per agent per tradable asset; cohort initial
+wealth uses that same set. An old manifest without `tradableAssets` behaves as
+before. Existing manually constructed `Context` objects default their tradable
+metadata to a detached copy of `assets`. New runtime contexts always carry the
+configured subset. Fill and wakeup callbacks in one wake cycle can share a
+snapshot; treat all context data as read-only.
+
+See `examples/scoped.json` for a two-asset experiment with a specialist buyer.
+
 
 These are `TypedDict` contracts: access remains `position['quantity']`, not
 `position.quantity`. They add autocomplete/static checking without changing the
@@ -165,7 +199,7 @@ Only trusted operator-installed code is supported; this is not a Python sandbox.
 
 Select your strategy for a group, set count/cash/inventory/wakeup/information,
 and put your strategy-specific settings in the group's parameters JSON. Inventory
-is allocated per selected asset per agent, so adding assets changes initial wealth.
+is allocated per tradable asset per agent, so changing scope changes initial wealth.
 Start with one asset and a small population. Idle counterparties do not trade;
 use the scripted fixture initially to supply known orders while checking behaviour.
 

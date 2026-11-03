@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: avighnajha/Stonks
-          ref: 7d81588ecc3c63dd2f015de32fec649735979a39 # Tested exchange contract; update deliberately.
+          ref: d5e29953682eb74acbe6afc150e19292774890de # Tested group trading-scope contract.
           path: exchange
       - uses: actions/setup-node@v4
         with:

@@ -22,14 +22,17 @@ def run(manifest, bridge, progress=lambda _:None, cancelled=lambda:False):
     for g in m['groups']:
         if g['strategy'] not in classes:raise ValueError('Strategy not installed: '+g['strategy'])
         for i in range(g['count']):
-            label=f"{g['id']}:{i}";agents[label]={'bot':classes[g['strategy']](g['parameters']),'group':g,'rng':stream(seed,'agent:'+label),'fills':'0'}
+            label=f"{g['id']}:{i}";agents[label]={'bot':classes[g['strategy']](g['parameters']),'group':g,'rng':stream(seed,'agent:'+label),'fills':'0','tradable':frozenset(g.get('tradableAssets',assets))}
     # Initial insertion order is part of protocol v1. Later ties use insertion sequence.
     scheduler.add(0,'world',{})
     for i,e in enumerate(m['events']):scheduler.add(e['atMs'],'shock',{'event':e,'index':i})
     for label in sorted(agents):scheduler.add(0,'wake',{'agent':label})
     sample_step=max(m['stepMs'],math.ceil(end/500))
     scheduler.add(0,'sample',{})
-    def context(label,tick):return Context(tick,bridge.request('state',tick,agent=label),agents[label]['rng'],dict(identities['assets']),public_assets(m['assets'],identities['assets']))
+    def context(label,tick):
+        metadata=public_assets(m['assets'],identities['assets'])
+        tradable={key:dict(asset) for key,asset in metadata.items() if key in agents[label]['tradable']}
+        return Context(tick,bridge.request('state',tick,agent=label),agents[label]['rng'],dict(identities['assets']),metadata,tradable_assets=tradable)
     def actions(label,tick,items):
         nonlocal commands
         if not isinstance(items,list) or len(items)>20:raise ValueError('Strategy must return at most 20 actions per callback')
@@ -47,7 +50,10 @@ def run(manifest, bridge, progress=lambda _:None, cancelled=lambda:False):
             commands+=1
             if commands>5000:raise ValueError('5,000-command run budget exceeded')
             key=f'cmd:{commands}'
-            try:result=bridge.request(op,tick,agent=label,key=key,**action)
+            try:
+                if op=='place' and (not isinstance(action.get('asset'),str) or action['asset'] not in agents[label]['tradable']):
+                    raise ValueError("Asset is outside this agent's trading universe")
+                result=bridge.request(op,tick,agent=label,key=key,**action)
             except ValueError as error:result={'rejected':True,'message':str(error)}
             decisions.append({'tick':tick,'agent':label,'action':{'op':op,**action},'result':result})
             scheduler.add(tick,'ack',{'agent':label,'result':result})
@@ -111,7 +117,8 @@ def run(manifest, bridge, progress=lambda _:None, cancelled=lambda:False):
         metrics[label]={'meanSpread':sum(o['spread'] for o in quoted)/len(quoted) if quoted else None,'emptyBookFraction':1-len(quoted)/len(observations) if observations else None,'referenceRmse':math.sqrt(sum((o['mid']-o['reference'])**2 for o in quoted)/len(quoted)) if quoted else None}
     cohort={}
     for g in m['groups']:
-        initial=float(g['cash'])+sum(float(g['inventory'])*float(a['price']) for a in m['assets']);wealth=[]
+        scope=frozenset(g.get('tradableAssets',assets))
+        initial=float(g['cash'])+sum(float(g['inventory'])*float(a['price']) for a in m['assets'] if a['id'] in scope);wealth=[]
         for i in range(g['count']):
             a=report['accounts'][f"{g['id']}:{i}"];wealth.append(float(a['wallet']['balance'])+float(a['wallet']['frozen_balance'])+sum(float(p['currentValue']) for p in a['positions']))
         cohort[g['id']]={'initialWealth':initial*g['count'],'finalWealth':sum(wealth),'pnl':sum(wealth)-initial*g['count']}

@@ -1,5 +1,6 @@
 """Opt-in real PostgreSQL + Node bridge integration; creates and drops own databases."""
 import copy,json,os,unittest,uuid
+from decimal import Decimal
 from pathlib import Path
 from stonks_sim.worker import execute
 from stonks_sim.bridge import Bridge,provision
@@ -43,7 +44,10 @@ class ExchangeTests(unittest.TestCase):
 
     def test_repeatable_real_settlement_and_observations(self):
         m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
-        first=execute(m,str(uuid.uuid4()));second=execute(m,str(uuid.uuid4()))
+        with patch.dict(os.environ, {'TZ':'Pacific/Honolulu'}):
+            first=execute(m,str(uuid.uuid4()))
+        with patch.dict(os.environ, {'TZ':'UTC'}):
+            second=execute(m,str(uuid.uuid4()))
         self.assertEqual(first['economicHash'],second['economicHash'])
         self.assertEqual(len(first['report']['trades']),1)
         self.assertEqual(first['report']['trades'][0]['price'],'99.00')
@@ -78,3 +82,71 @@ class ExchangeTests(unittest.TestCase):
         finally:
             for b in bridges:b.close()
             for name in created:provision('drop',name)
+
+    def test_runner_exposes_scope_in_every_callback_and_rejects_context_widening(self):
+        seen=[]
+        class Scoped(Strategy):
+            def __init__(self, parameters):
+                super().__init__(parameters);self.sent=False
+            def inspect(self, name, context):
+                seen.append(name)
+                self_test.assertEqual(set(context.assets), {'a','b'})
+                self_test.assertEqual(set(context.state['books']), {'a','b'})
+                self_test.assertEqual(set(context.tradable_assets), {'a'})
+                self_test.assertEqual(len(context.state['account']['positions']), 1)
+                self_test.assertEqual(context.tradable_assets['a']['exchange_id'], context.asset_ids['a'])
+            def on_wakeup(self, context):
+                self.inspect('wake',context)
+                if self.sent:return []
+                self.sent=True
+                context.tradable_assets['b']=context.assets['b']
+                return [{'op':'place','asset':label,'side':'BUY','type':'LIMIT','price':'100.00','quantity':'1.0000'} for label in ['b','a']]
+            def on_order_update(self, update, context):self.inspect('ack',context);return []
+            def on_fill(self, fill, context):self.inspect('fill',context);return []
+            def on_observation(self, observation, context):self.inspect('observation',context);return []
+        from stonks_sim.sdk import Scripted
+        class MultiAsset(Scripted):
+            def on_wakeup(self, context):
+                self_test.assertEqual(set(context.tradable_assets), {'a','b'})
+                return super().on_wakeup(context)
+        self_test=self
+        m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
+        m['assets'].append({**m['assets'][0],'id':'b','name':'Asset B'})
+        m['groups'][0]['tradableAssets']=['a','b']
+        m['groups'][1].update(strategy='idle',tradableAssets=['a'])
+        with patch('stonks_sim.simulation.registry',return_value={'idle':Scoped,'scripted':MultiAsset}):
+            first=execute(m,str(uuid.uuid4()))
+            second=execute(m,str(uuid.uuid4()))
+        self.assertEqual(first['economicHash'],second['economicHash'])
+        self.assertEqual(set(seen),{'wake','ack','fill','observation'})
+        rejected=[d for d in first['decisions'] if d['result'].get('rejected')]
+        self.assertEqual(len(rejected),1)
+        self.assertIn('trading universe',rejected[0]['result']['message'])
+        self.assertEqual(len(first['report']['trades']),1)
+        self.assertEqual(first['cohorts']['buyer']['initialWealth'],2000)
+        self.assertEqual(first['cohorts']['seller']['initialWealth'],3000)
+        self.assertEqual(first['report']['cash'],'2000.000000')
+        self.assertTrue(all(Decimal(s['expected'])==Decimal(s['actual']) for s in first['report']['supplies']))
+
+    def test_direct_adapter_rejects_outside_scope_without_reserving_cash(self):
+        name='stonks_run_'+uuid.uuid4().hex;bridge=None;created=False
+        try:
+            url=provision('create',name)['url'];created=True;bridge=Bridge(url)
+            m=json.loads((Path(__file__).parent.parent/'examples'/'smoke.json').read_text())
+            m['assets'].append({**m['assets'][0],'id':'b','name':'Asset B'})
+            m['groups'][1]['tradableAssets']=['a']
+            identities=bridge.request('init',0,manifest=m)
+            before=bridge.request('state',0,agent='buyer:0')
+            self.assertEqual(set(before['books']),{'a','b'})
+            self.assertEqual(len(before['account']['positions']),1)
+            with self.assertRaisesRegex(ValueError,'trading universe'):
+                bridge.request('place',0,agent='buyer:0',asset='b',side='BUY',type='LIMIT',price='90.00',quantity='1.0000',key='outside')
+            self.assertEqual(bridge.request('state',0,agent='buyer:0'),before)
+            accepted=bridge.request('place',0,agent='buyer:0',asset='a',side='BUY',type='LIMIT',price='90.00',quantity='1.0000',key='inside')
+            bridge.request('cancel',0,agent='buyer:0',orderId=accepted['orderId'],key='cancel-inside')
+            after=bridge.request('state',0,agent='buyer:0')
+            self.assertEqual(after['account']['wallet'],before['account']['wallet'])
+            self.assertEqual(after['orders'][0]['status'],'CANCELLED')
+        finally:
+            if bridge:bridge.close()
+            if created:provision('drop',name)
